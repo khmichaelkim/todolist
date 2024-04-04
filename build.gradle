@@ -1,0 +1,105 @@
+import java.text.SimpleDateFormat
+
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+tasks.withType(Checkstyle) {
+    reports {
+        xml.enabled false
+        html.enabled true
+    }
+}
+
+// for use with the Gradle Java Plugin
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/']
+        }
+        resources {
+            srcDirs = ['src/resources/']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['tst/']
+        }
+        resources {
+            srcDirs = ['tst/resources/']
+        }
+    }
+}
+
+dependencies {
+    implementation 'org.junit.jupiter:junit-jupiter:5.7.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.2'
+
+    implementation 'com.google.guava:guava:30.1.1-jre'
+
+    testImplementation group: 'org.mockito', name: 'mockito-core', version: '3.10.0'
+
+    implementation group: 'com.google.code.gson', name: 'gson', version: '2.7'
+    implementation group: 'com.google.dagger', name: 'dagger', version: '2.15'
+
+    implementation "com.google.dagger:dagger:2.15"
+    annotationProcessor"com.google.dagger:dagger-compiler:2.15"
+
+    // https://mvnrepository.com/artifact/org.testng/testng
+    implementation group: 'org.testng', name: 'testng', version: '6.14.3'
+
+    // Added for AWS DynamoDB
+    implementation 'com.amazonaws:aws-java-sdk-dynamodb:1.12.+'
+
+    // Added for AWS Lambda Functions
+    implementation platform('com.amazonaws:aws-java-sdk-bom:1.11.1000')
+    implementation 'com.amazonaws:aws-java-sdk-s3'
+    implementation 'com.amazonaws:aws-lambda-java-core:1.2.1'
+    implementation 'com.amazonaws:aws-lambda-java-events:2.2.9'
+    runtimeOnly 'com.amazonaws:aws-lambda-java-log4j2:1.2.0'
+
+    // Added for using log4j usage
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.14.1'
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.14.1'
+
+}
+
+task buildZip(type: Zip) {
+    from compileJava
+    from processResources
+    into('lib') {
+        from configurations.runtimeClasspath
+    }
+
+    // Create a date format for the current date and time
+    def dateFormat = new SimpleDateFormat('yyMMdd')
+    def timeFormat = new SimpleDateFormat('HHmm')
+    def currentDate = new Date()
+    def formattedDate = dateFormat.format(currentDate)
+    def formattedTime = timeFormat.format(currentDate)
+
+    // Specify the destination directory for the zip file
+    destinationDirectory = file('/Users/kangster/Downloads')
+    // Optionally, specify the name of the zip file
+    archiveFileName = "${formattedDate}_UnitProject_v${formattedTime}.zip"
+}
+
+task upload(dependsOn: buildZip) {
+
+    doLast {
+        def zipFilePath = "${buildZip.destinationDirectory.get()}/${buildZip.archiveFileName.get()}"
+
+        def s3BucketPath = "s3://to-dolist/${buildZip.archiveFileName.get()}"
+
+        exec {
+            commandLine 'aws', 's3', 'cp', zipFilePath, s3BucketPath
+        }
+
+        // aws s3 cp /Users/kangster/Downloads/240321_UnitProject_v1038.zip s3://to-dolist/240321UnitProject_v1038.zip
+    }
+}
